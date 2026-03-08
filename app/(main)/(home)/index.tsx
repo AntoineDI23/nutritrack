@@ -44,7 +44,7 @@ export default function Page() {
         Bonjour {user?.emailAddresses?.[0]?.emailAddress}
       </ThemedText>
 
-      <View style={styles.row}>
+      <View style={styles.actions}>
         <Link href="/add">
           <ThemedText type="link">+ Ajouter un repas</ThemedText>
         </Link>
@@ -53,7 +53,9 @@ export default function Page() {
       <ThemedText style={styles.sectionTitle}>Mes repas</ThemedText>
 
       {meals.length === 0 ? (
-        <ThemedText style={styles.muted}>Aucun repas enregistré pour l’instant.</ThemedText>
+        <ThemedText style={styles.muted}>
+          Aucun repas enregistré pour l’instant.
+        </ThemedText>
       ) : (
         <View style={styles.list}>
           {meals.map((meal) => {
@@ -68,10 +70,7 @@ export default function Page() {
                 <ThemedText style={styles.cardTitle}>{meal.name}</ThemedText>
                 <ThemedText style={styles.muted}>{meal.date}</ThemedText>
                 <ThemedText style={styles.muted}>
-                  {meal.foods.length} aliment{meal.foods.length > 1 ? "s" : ""}
-                </ThemedText>
-                <ThemedText style={styles.muted}>
-                  {round1(totals.calories)} kcal • P {round1(totals.proteins)}g • G {round1(totals.carbs)}g • L {round1(totals.fats)}g
+                  {round1(totals.calories)} kcal
                 </ThemedText>
               </Pressable>
             );
@@ -83,17 +82,40 @@ export default function Page() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, gap: 12 },
-  row: { flexDirection: "row", alignItems: "center", gap: 12, flexWrap: "wrap" },
-  sectionTitle: { marginTop: 12, fontSize: 18, fontWeight: "700" },
-  muted: { opacity: 0.8 },
-  list: { gap: 10, marginTop: 8 },
+  container: {
+    flex: 1,
+    padding: 20,
+    gap: 12,
+  },
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  sectionTitle: {
+    marginTop: 12,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  muted: {
+    opacity: 0.8,
+  },
+  list: {
+    gap: 10,
+    marginTop: 8,
+  },
   card: {
     borderWidth: 1,
     borderColor: "#ddd",
     borderRadius: 12,
     padding: 12,
   },
-  cardPressed: { opacity: 0.75 },
-  cardTitle: { fontSize: 16, fontWeight: "700" },
+  cardPressed: {
+    opacity: 0.75,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
 });
