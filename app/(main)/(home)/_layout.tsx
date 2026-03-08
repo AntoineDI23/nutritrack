@@ -1,4 +1,3 @@
-import * as React from "react";
 import { Stack, useRouter } from "expo-router";
 import { Pressable } from "react-native";
 import { ThemedText } from "@/components/themed-text";

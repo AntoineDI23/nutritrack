@@ -2,7 +2,6 @@ import * as React from "react";
 import { ActivityIndicator, StyleSheet } from "react-native";
 import { Redirect, Stack } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
-
 import { ThemedView } from "@/components/themed-view";
 
 export default function MainLayout() {
@@ -17,12 +16,16 @@ export default function MainLayout() {
   }
 
   if (!isSignedIn) {
-    return <Redirect href="/(auth)/sign-in" />;
+    return <Redirect href="/login" />;
   }
 
   return <Stack screenOptions={{ headerShown: false }} />;
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

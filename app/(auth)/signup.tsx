@@ -140,7 +140,7 @@ export default function Page() {
       </Pressable>
       <View style={styles.linkContainer}>
         <ThemedText>Have an account? </ThemedText>
-        <Link href="/sign-in">
+        <Link href="/login">
           <ThemedText type="link">Sign in</ThemedText>
         </Link>
       </View>

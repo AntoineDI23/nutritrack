@@ -167,7 +167,7 @@ export default function Page() {
       </Pressable>
       <View style={styles.linkContainer}>
         <ThemedText>Don't have an account? </ThemedText>
-        <Link href="/sign-up">
+        <Link href="/signup">
           <ThemedText type="link">Sign up</ThemedText>
         </Link>
       </View>

@@ -202,10 +202,10 @@ export default function Page() {
       <SignedOut>
         <ThemedText>Tu dois être connecté pour ajouter un repas.</ThemedText>
         <View style={styles.row}>
-          <Link href="/(auth)/sign-in">
-            <ThemedText type="link">Sign in</ThemedText>
+          <Link href="/(auth)/login">
+            <ThemedText type="link">Login</ThemedText>
           </Link>
-          <Link href="/(auth)/sign-up">
+          <Link href="/(auth)/signup">
             <ThemedText type="link">Sign up</ThemedText>
           </Link>
         </View>
