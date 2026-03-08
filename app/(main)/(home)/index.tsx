@@ -18,6 +18,49 @@ function getTodayDate() {
   return new Date().toISOString().split("T")[0];
 }
 
+type DailyGroup = {
+  date: string;
+  meals: Meal[];
+  totals: {
+    calories: number;
+    proteins: number;
+    carbs: number;
+    fats: number;
+  };
+};
+
+function groupMealsByDate(meals: Meal[]): DailyGroup[] {
+  const map = new Map<string, Meal[]>();
+
+  for (const meal of meals) {
+    const current = map.get(meal.date) ?? [];
+    current.push(meal);
+    map.set(meal.date, current);
+  }
+
+  return Array.from(map.entries())
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([date, mealsForDate]) => {
+      const totals = mealsForDate.reduce(
+        (acc, meal) => {
+          const mealTotals = computeMealTotals(meal);
+          acc.calories += mealTotals.calories;
+          acc.proteins += mealTotals.proteins;
+          acc.carbs += mealTotals.carbs;
+          acc.fats += mealTotals.fats;
+          return acc;
+        },
+        { calories: 0, proteins: 0, carbs: 0, fats: 0 },
+      );
+
+      return {
+        date,
+        meals: mealsForDate,
+        totals,
+      };
+    });
+}
+
 export default function Page() {
   const router = useRouter();
   const { user } = useUser();
@@ -59,6 +102,8 @@ export default function Page() {
     dailyCalorieGoal > 0 ? todaysCalories / dailyCalorieGoal : 0;
   const progressPercent = Math.min(progressRatio * 100, 100);
 
+  const groupedMeals = groupMealsByDate(meals);
+
   return (
     <ThemedView style={styles.container}>
       <ThemedText type="title">NutriTrack</ThemedText>
@@ -97,29 +142,54 @@ export default function Page() {
 
       <ThemedText style={styles.sectionTitle}>Mes repas</ThemedText>
 
-      {meals.length === 0 ? (
+      {groupedMeals.length === 0 ? (
         <ThemedText style={styles.muted}>
           Aucun repas enregistré pour l’instant.
         </ThemedText>
       ) : (
-        <View style={styles.list}>
-          {meals.map((meal) => {
-            const totals = computeMealTotals(meal);
-
-            return (
-              <Pressable
-                key={meal.id}
-                style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-                onPress={() => openMeal(meal.id)}
-              >
-                <ThemedText style={styles.cardTitle}>{meal.name}</ThemedText>
-                <ThemedText style={styles.muted}>{meal.date}</ThemedText>
+        <View style={styles.groupsContainer}>
+          {groupedMeals.map((group) => (
+            <View key={group.date} style={styles.daySection}>
+              <View style={styles.dayHeader}>
+                <ThemedText style={styles.dayTitle}>{group.date}</ThemedText>
                 <ThemedText style={styles.muted}>
-                  {round1(totals.calories)} kcal
+                  {group.meals.length} repas
                 </ThemedText>
-              </Pressable>
-            );
-          })}
+              </View>
+
+              <View style={styles.dailySummaryCard}>
+                <ThemedText style={styles.dailySummaryTitle}>
+                  Résumé nutritionnel quotidien
+                </ThemedText>
+                <ThemedText style={styles.muted}>
+                  {round1(group.totals.calories)} kcal • P {round1(group.totals.proteins)}g • G{" "}
+                  {round1(group.totals.carbs)}g • L {round1(group.totals.fats)}g
+                </ThemedText>
+              </View>
+
+              <View style={styles.list}>
+                {group.meals.map((meal) => {
+                  const totals = computeMealTotals(meal);
+
+                  return (
+                    <Pressable
+                      key={meal.id}
+                      style={({ pressed }) => [
+                        styles.card,
+                        pressed && styles.cardPressed,
+                      ]}
+                      onPress={() => openMeal(meal.id)}
+                    >
+                      <ThemedText style={styles.cardTitle}>{meal.name}</ThemedText>
+                      <ThemedText style={styles.muted}>
+                        {round1(totals.calories)} kcal
+                      </ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          ))}
         </View>
       )}
     </ThemedView>
@@ -146,9 +216,35 @@ const styles = StyleSheet.create({
   muted: {
     opacity: 0.8,
   },
+  groupsContainer: {
+    gap: 16,
+    marginTop: 8,
+  },
+  daySection: {
+    gap: 10,
+  },
+  dayHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  dayTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  dailySummaryCard: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 12,
+    padding: 12,
+    gap: 6,
+  },
+  dailySummaryTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
   list: {
     gap: 10,
-    marginTop: 8,
   },
   card: {
     borderWidth: 1,
