@@ -15,26 +15,20 @@ export default function Page() {
   const [code, setCode] = React.useState('')
   const [showEmailCode, setShowEmailCode] = React.useState(false)
 
-  // Handle the submission of the sign-in form
   const onSignInPress = React.useCallback(async () => {
     if (!isLoaded) return
 
-    // Start the sign-in process using the email and password provided
     try {
       const signInAttempt = await signIn.create({
         identifier: emailAddress,
         password,
       })
 
-      // If sign-in process is complete, set the created session as active
-      // and redirect the user
       if (signInAttempt.status === 'complete') {
         await setActive({
           session: signInAttempt.createdSessionId,
           navigate: async ({ session }) => {
             if (session?.currentTask) {
-              // Check for tasks and navigate to custom UI to help users resolve them
-              // See https://clerk.com/docs/guides/development/custom-flows/authentication/session-tasks
               console.log(session?.currentTask)
               return
             }
@@ -43,10 +37,6 @@ export default function Page() {
           },
         })
       } else if (signInAttempt.status === 'needs_second_factor') {
-        // Check if email_code is a valid second factor
-        // This is required when Client Trust is enabled and the user
-        // is signing in from a new device.
-        // See https://clerk.com/docs/guides/secure/client-trust
         const emailCodeFactor = signInAttempt.supportedSecondFactors?.find(
           (factor): factor is EmailCodeFactor => factor.strategy === 'email_code',
         )
@@ -59,18 +49,13 @@ export default function Page() {
           setShowEmailCode(true)
         }
       } else {
-        // If the status is not complete, check why. User may need to
-        // complete further steps.
         console.error(JSON.stringify(signInAttempt, null, 2))
       }
     } catch (err) {
-      // See https://clerk.com/docs/guides/development/custom-flows/error-handling
-      // for more info on error handling
       console.error(JSON.stringify(err, null, 2))
     }
   }, [isLoaded, signIn, setActive, router, emailAddress, password])
 
-  // Handle the submission of the email verification code
   const onVerifyPress = React.useCallback(async () => {
     if (!isLoaded) return
 
@@ -85,8 +70,6 @@ export default function Page() {
           session: signInAttempt.createdSessionId,
           navigate: async ({ session }) => {
             if (session?.currentTask) {
-              // Check for tasks and navigate to custom UI to help users resolve them
-              // See https://clerk.com/docs/guides/development/custom-flows/authentication/session-tasks
               console.log(session?.currentTask)
               return
             }
@@ -102,20 +85,19 @@ export default function Page() {
     }
   }, [isLoaded, signIn, setActive, router, code])
 
-  // Display email code verification form
   if (showEmailCode) {
     return (
       <ThemedView style={styles.container}>
         <ThemedText type="title" style={styles.title}>
-          Verify your email
+          Vérifie ton adresse e-mail
         </ThemedText>
         <ThemedText style={styles.description}>
-          A verification code has been sent to your email.
+          Un code de vérification a été envoyé à ton adresse e-mail.
         </ThemedText>
         <TextInput
           style={styles.input}
           value={code}
-          placeholder="Enter verification code"
+          placeholder="Entre le code de vérification"
           placeholderTextColor="#666666"
           onChangeText={(code) => setCode(code)}
           keyboardType="numeric"
@@ -124,7 +106,7 @@ export default function Page() {
           style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
           onPress={onVerifyPress}
         >
-          <ThemedText style={styles.buttonText}>Verify</ThemedText>
+          <ThemedText style={styles.buttonText}>Vérifier</ThemedText>
         </Pressable>
       </ThemedView>
     )
@@ -133,23 +115,23 @@ export default function Page() {
   return (
     <ThemedView style={styles.container}>
       <ThemedText type="title" style={styles.title}>
-        Sign in
+        Connexion
       </ThemedText>
-      <ThemedText style={styles.label}>Email address</ThemedText>
+      <ThemedText style={styles.label}>Adresse e-mail</ThemedText>
       <TextInput
         style={styles.input}
         autoCapitalize="none"
         value={emailAddress}
-        placeholder="Enter email"
+        placeholder="Entre ton adresse e-mail"
         placeholderTextColor="#666666"
         onChangeText={(emailAddress) => setEmailAddress(emailAddress)}
         keyboardType="email-address"
       />
-      <ThemedText style={styles.label}>Password</ThemedText>
+      <ThemedText style={styles.label}>Mot de passe</ThemedText>
       <TextInput
         style={styles.input}
         value={password}
-        placeholder="Enter password"
+        placeholder="Entre ton mot de passe"
         placeholderTextColor="#666666"
         secureTextEntry={true}
         onChangeText={(password) => setPassword(password)}
@@ -163,12 +145,12 @@ export default function Page() {
         onPress={onSignInPress}
         disabled={!emailAddress || !password}
       >
-        <ThemedText style={styles.buttonText}>Sign in</ThemedText>
+        <ThemedText style={styles.buttonText}>Se connecter</ThemedText>
       </Pressable>
       <View style={styles.linkContainer}>
-        <ThemedText>Don't have an account? </ThemedText>
+        <ThemedText>Tu n'as pas encore de compte ? </ThemedText>
         <Link href="/signup">
-          <ThemedText type="link">Sign up</ThemedText>
+          <ThemedText type="link">S'inscrire</ThemedText>
         </Link>
       </View>
     </ThemedView>
