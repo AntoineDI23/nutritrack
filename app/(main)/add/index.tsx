@@ -1,18 +1,25 @@
 import * as React from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { Image, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from "react-native";
 import { useRouter } from "expo-router";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import type { Food, Meal, MealName } from "@/types/models";
-import { MEAL_NAMES } from "@/types/models";
-import { addMeal } from "@/utils/meals-storage";
 import { consumeLastScan } from "@/state/scan-result";
 import { getFoodByBarcode, searchFoodsByText } from "@/services/open-food-facts";
+import { MEAL_NAMES, type Food, type Meal, type MealName } from "@/types/models";
+import { addMeal } from "@/utils/meals-storage";
 
-function getTodayDate() {
+function getTodayDate(): string {
   return new Date().toISOString().split("T")[0];
 }
 
@@ -20,23 +27,27 @@ function round1(n: number) {
   return Math.round(n * 10) / 10;
 }
 
-export default function Page() {
+export default function AddMealPage() {
   const router = useRouter();
 
   const [mealName, setMealName] = React.useState<MealName>("Déjeuner");
-  const [mealDate, setMealDate] = React.useState(getTodayDate());
   const [foods, setFoods] = React.useState<Food[]>([]);
 
   const [query, setQuery] = React.useState("");
-  const debouncedQuery = useDebouncedValue(query, 700);
+  const debouncedQuery = useDebouncedValue(query, 500);
 
   const [results, setResults] = React.useState<Food[]>([]);
   const [loadingSearch, setLoadingSearch] = React.useState(false);
   const [loadingScan, setLoadingScan] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   const addFoodToMeal = React.useCallback((food: Food) => {
     setFoods((prev) => [...prev, food]);
+  }, []);
+
+  const removeFood = React.useCallback((index: number) => {
+    setFoods((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
   useFocusEffect(
@@ -79,9 +90,9 @@ export default function Page() {
   );
 
   React.useEffect(() => {
-    const trimmed = debouncedQuery.trim();
+    const trimmedQuery = debouncedQuery.trim();
 
-    if (trimmed.length < 2) {
+    if (trimmedQuery.length < 2) {
       setResults([]);
       setLoadingSearch(false);
       return;
@@ -94,10 +105,10 @@ export default function Page() {
         setLoadingSearch(true);
         setError(null);
 
-        const foodsFound = await searchFoodsByText(trimmed, 10);
+        const foundFoods = await searchFoodsByText(trimmedQuery, 10);
 
         if (!cancelled) {
-          setResults(foodsFound);
+          setResults(foundFoods);
         }
       } catch {
         if (!cancelled) {
@@ -115,30 +126,30 @@ export default function Page() {
     };
   }, [debouncedQuery]);
 
-  const removeFood = (index: number) => {
-    setFoods((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const saveCurrentMeal = async () => {
-    if (!mealDate.trim()) {
-      setError("Renseigne une date de repas.");
-      return;
-    }
-
+  const handleValidate = async () => {
     if (foods.length === 0) {
-      setError("Ajoute au moins un aliment.");
+      setError("Ajoute au moins un aliment avant de valider.");
       return;
     }
 
-    const meal: Meal = {
-      id: Date.now().toString(),
-      name: mealName,
-      date: mealDate,
-      foods,
-    };
+    try {
+      setSaving(true);
+      setError(null);
 
-    await addMeal(meal);
-    router.replace("/");
+      const meal: Meal = {
+        id: Date.now().toString(),
+        name: mealName,
+        date: getTodayDate(),
+        foods,
+      };
+
+      await addMeal(meal);
+      router.replace("/");
+    } catch {
+      setError("Impossible d’enregistrer le repas.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -149,14 +160,14 @@ export default function Page() {
         <ThemedText style={styles.label}>Type de repas</ThemedText>
         <View style={styles.mealTypeContainer}>
           {MEAL_NAMES.map((name) => {
-            const selected = mealName === name;
+            const isSelected = mealName === name;
 
             return (
               <Pressable
                 key={name}
                 style={({ pressed }) => [
                   styles.mealTypeButton,
-                  selected && styles.mealTypeButtonSelected,
+                  isSelected && styles.mealTypeButtonSelected,
                   pressed && styles.pressed,
                 ]}
                 onPress={() => setMealName(name)}
@@ -164,7 +175,7 @@ export default function Page() {
                 <ThemedText
                   style={[
                     styles.mealTypeButtonText,
-                    selected && styles.mealTypeButtonTextSelected,
+                    isSelected && styles.mealTypeButtonTextSelected,
                   ]}
                 >
                   {name}
@@ -174,47 +185,50 @@ export default function Page() {
           })}
         </View>
 
-        <ThemedText style={styles.label}>Date</ThemedText>
-        <TextInput
-          style={styles.input}
-          value={mealDate}
-          onChangeText={setMealDate}
-          placeholder="2025-02-10"
-          placeholderTextColor="#666666"
-        />
+        <ThemedText style={styles.sectionTitle}>Ajouter des aliments</ThemedText>
 
-        <ThemedText style={styles.sectionTitle}>Ajouter un aliment</ThemedText>
-
-        <Pressable style={styles.scanButton} onPress={() => router.push("/add/camera")}>
+        <Pressable
+          style={({ pressed }) => [styles.scanButton, pressed && styles.pressed]}
+          onPress={() => router.push("/add/camera")}
+        >
           <ThemedText style={styles.scanButtonText}>Scanner un code-barres</ThemedText>
         </Pressable>
 
         {loadingScan && (
-          <ThemedText style={styles.muted}>Récupération du produit scanné…</ThemedText>
+          <View style={styles.feedbackRow}>
+            <ActivityIndicator />
+            <ThemedText>Récupération du produit scanné…</ThemedText>
+          </View>
         )}
 
-        <ThemedText style={styles.muted}>Ou recherche par texte :</ThemedText>
+        <ThemedText style={styles.muted}>Ou rechercher par texte :</ThemedText>
 
         <TextInput
           style={styles.input}
           value={query}
           onChangeText={setQuery}
-          placeholder="Ex: coca cola"
+          placeholder="Ex : coca cola"
           placeholderTextColor="#666666"
           autoCapitalize="none"
         />
 
         {loadingSearch && (
-          <ThemedText style={styles.muted}>Recherche…</ThemedText>
+          <View style={styles.feedbackRow}>
+            <ActivityIndicator />
+            <ThemedText>Recherche…</ThemedText>
+          </View>
         )}
 
         {!!error && <ThemedText style={styles.error}>{error}</ThemedText>}
 
-        {!loadingSearch && debouncedQuery.trim().length >= 2 && results.length === 0 && !error && (
-          <ThemedText style={styles.muted}>
-            Aucun résultat. Tous les produits ne sont pas forcément dans Open Food Facts.
-          </ThemedText>
-        )}
+        {!loadingSearch &&
+          debouncedQuery.trim().length >= 2 &&
+          results.length === 0 &&
+          !error && (
+            <ThemedText style={styles.muted}>
+              Aucun résultat. Tous les produits ne sont pas forcément dans Open Food Facts.
+            </ThemedText>
+          )}
 
         <View style={styles.results}>
           {results.map((food) => (
@@ -232,12 +246,11 @@ export default function Page() {
               <View style={styles.resultContent}>
                 <ThemedText style={styles.cardTitle}>{food.name}</ThemedText>
 
-                {!!food.brand && (
-                  <ThemedText style={styles.muted}>{food.brand}</ThemedText>
-                )}
+                {!!food.brand && <ThemedText style={styles.muted}>{food.brand}</ThemedText>}
 
                 <ThemedText style={styles.muted}>
-                  {round1(food.calories)} kcal • P {round1(food.proteins)}g • G {round1(food.carbs)}g • L {round1(food.fats)}g
+                  {round1(food.calories)} kcal • P {round1(food.proteins)}g • G{" "}
+                  {round1(food.carbs)}g • L {round1(food.fats)}g
                 </ThemedText>
 
                 {!!food.nutriscore && (
@@ -252,10 +265,10 @@ export default function Page() {
           ))}
         </View>
 
-        <ThemedText style={styles.sectionTitle}>Aliments du repas</ThemedText>
+        <ThemedText style={styles.sectionTitle}>Aliments ajoutés</ThemedText>
 
         {foods.length === 0 ? (
-          <ThemedText style={styles.muted}>Aucun aliment ajouté.</ThemedText>
+          <ThemedText style={styles.muted}>Aucun aliment ajouté au repas en cours.</ThemedText>
         ) : (
           <View style={styles.results}>
             {foods.map((food, index) => (
@@ -269,12 +282,11 @@ export default function Page() {
                 <View style={styles.resultContent}>
                   <ThemedText style={styles.cardTitle}>{food.name}</ThemedText>
 
-                  {!!food.brand && (
-                    <ThemedText style={styles.muted}>{food.brand}</ThemedText>
-                  )}
+                  {!!food.brand && <ThemedText style={styles.muted}>{food.brand}</ThemedText>}
 
                   <ThemedText style={styles.muted}>
-                    {round1(food.calories)} kcal • P {round1(food.proteins)}g • G {round1(food.carbs)}g • L {round1(food.fats)}g
+                    {round1(food.calories)} kcal • P {round1(food.proteins)}g • G{" "}
+                    {round1(food.carbs)}g • L {round1(food.fats)}g
                   </ThemedText>
                 </View>
 
@@ -288,14 +300,16 @@ export default function Page() {
 
         <Pressable
           style={({ pressed }) => [
-            styles.saveButton,
-            foods.length === 0 && styles.saveButtonDisabled,
+            styles.validateButton,
+            (foods.length === 0 || saving) && styles.validateButtonDisabled,
             pressed && styles.pressed,
           ]}
-          onPress={saveCurrentMeal}
-          disabled={foods.length === 0}
+          onPress={handleValidate}
+          disabled={foods.length === 0 || saving}
         >
-          <ThemedText style={styles.saveButtonText}>Enregistrer le repas</ThemedText>
+          <ThemedText style={styles.validateButtonText}>
+            {saving ? "Enregistrement..." : "Valider"}
+          </ThemedText>
         </Pressable>
       </ScrollView>
     </ThemedView>
@@ -303,7 +317,9 @@ export default function Page() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flex: 1,
+  },
   content: {
     padding: 20,
     gap: 12,
@@ -331,6 +347,11 @@ const styles = StyleSheet.create({
   error: {
     color: "#c62828",
     fontWeight: "700",
+  },
+  feedbackRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   mealTypeContainer: {
     flexDirection: "row",
@@ -398,17 +419,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#ddd",
   },
-  saveButton: {
+  validateButton: {
     backgroundColor: "#0a7ea4",
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: "center",
     marginTop: 10,
   },
-  saveButtonDisabled: {
+  validateButtonDisabled: {
     opacity: 0.5,
   },
-  saveButtonText: {
+  validateButtonText: {
     color: "#fff",
     fontWeight: "800",
   },
