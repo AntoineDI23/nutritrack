@@ -1,21 +1,27 @@
 import * as React from "react";
-import { Image, Pressable, StyleSheet, View } from "react-native";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import type { Meal } from "@/types/models";
-import { computeMealTotals, getMealById } from "@/utils/meals-storage";
+import {
+  computeMealTotals,
+  deleteMealById,
+  getMealById,
+} from "@/utils/meals-storage";
 
 function round1(n: number) {
   return Math.round(n * 10) / 10;
 }
 
-export default function Page() {
+export default function MealDetailPage() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+
   const [meal, setMeal] = React.useState<Meal | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
   const refreshMeal = React.useCallback(async () => {
     const mealId = String(id ?? "");
@@ -34,6 +40,40 @@ export default function Page() {
     }, [refreshMeal]),
   );
 
+  const handleDelete = React.useCallback(() => {
+    if (!meal || isDeleting) return;
+
+    Alert.alert(
+      "Supprimer le repas",
+      `Voulez-vous vraiment supprimer le repas "${meal.name}" ?`,
+      [
+        {
+          text: "Annuler",
+          style: "cancel",
+        },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setIsDeleting(true);
+              await deleteMealById(meal.id);
+              router.replace("/");
+            } catch (error) {
+              console.error(error);
+              Alert.alert(
+                "Erreur",
+                "Impossible de supprimer ce repas pour le moment.",
+              );
+            } finally {
+              setIsDeleting(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [meal, isDeleting, router]);
+
   if (!meal) {
     return (
       <ThemedView style={styles.container}>
@@ -42,8 +82,8 @@ export default function Page() {
           Ce repas n’existe plus ou son identifiant est invalide.
         </ThemedText>
 
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <ThemedText type="link">← Retour</ThemedText>
+        <Pressable onPress={() => router.replace("/")}>
+          <ThemedText type="link">Retour à l’accueil</ThemedText>
         </Pressable>
       </ThemedView>
     );
@@ -53,96 +93,137 @@ export default function Page() {
 
   return (
     <ThemedView style={styles.container}>
-      <Pressable onPress={() => router.back()} style={styles.backBtn}>
-        <ThemedText type="link">← Retour</ThemedText>
-      </Pressable>
-
       <ThemedText type="title">{meal.name}</ThemedText>
       <ThemedText style={styles.muted}>{meal.date}</ThemedText>
 
-      <View style={styles.summary}>
-        <ThemedText style={styles.summaryText}>{round1(totals.calories)} kcal</ThemedText>
-        <ThemedText style={styles.muted}>
-          Protéines {round1(totals.proteins)}g • Glucides {round1(totals.carbs)}g • Lipides {round1(totals.fats)}g
+      <View style={styles.summaryCard}>
+        <ThemedText style={styles.summaryTitle}>Total nutritionnel</ThemedText>
+        <ThemedText style={styles.summaryLine}>
+          Calories : {round1(totals.calories)} kcal
+        </ThemedText>
+        <ThemedText style={styles.summaryLine}>
+          Protéines : {round1(totals.proteins)} g
+        </ThemedText>
+        <ThemedText style={styles.summaryLine}>
+          Glucides : {round1(totals.carbs)} g
+        </ThemedText>
+        <ThemedText style={styles.summaryLine}>
+          Lipides : {round1(totals.fats)} g
         </ThemedText>
       </View>
 
       <ThemedText style={styles.sectionTitle}>Aliments</ThemedText>
 
       {meal.foods.length === 0 ? (
-        <ThemedText style={styles.muted}>Aucun aliment dans ce repas.</ThemedText>
+        <ThemedText style={styles.muted}>
+          Aucun aliment dans ce repas.
+        </ThemedText>
       ) : (
         <View style={styles.list}>
           {meal.foods.map((food, index) => (
-            <View key={`${food.id}-${index}`} style={styles.itemRow}>
-              {food.image_url ? (
-                <Image source={{ uri: food.image_url }} style={styles.thumb} />
-              ) : (
-                <View style={[styles.thumb, styles.thumbPlaceholder]} />
+            <View key={`${food.id}-${index}`} style={styles.foodCard}>
+              <ThemedText style={styles.foodName}>{food.name}</ThemedText>
+
+              {!!food.brand && (
+                <ThemedText style={styles.muted}>{food.brand}</ThemedText>
               )}
 
-              <View style={styles.itemContent}>
-                <ThemedText style={styles.cardTitle}>{food.name}</ThemedText>
-
-                {!!food.brand && (
-                  <ThemedText style={styles.muted}>{food.brand}</ThemedText>
-                )}
-
-                <ThemedText style={styles.muted}>
-                  {round1(food.calories)} kcal • P {round1(food.proteins)}g • G {round1(food.carbs)}g • L {round1(food.fats)}g
-                </ThemedText>
-
-                {!!food.nutriscore && (
-                  <ThemedText style={styles.muted}>
-                    Nutri-Score {food.nutriscore.toUpperCase()}
-                  </ThemedText>
-                )}
-              </View>
+              <ThemedText style={styles.foodLine}>
+                Calories : {round1(food.calories)} kcal
+              </ThemedText>
+              <ThemedText style={styles.foodLine}>
+                Protéines : {round1(food.proteins)} g
+              </ThemedText>
+              <ThemedText style={styles.foodLine}>
+                Glucides : {round1(food.carbs)} g
+              </ThemedText>
+              <ThemedText style={styles.foodLine}>
+                Lipides : {round1(food.fats)} g
+              </ThemedText>
             </View>
           ))}
         </View>
       )}
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.deleteButton,
+          isDeleting && styles.deleteButtonDisabled,
+          pressed && styles.pressed,
+        ]}
+        onPress={handleDelete}
+        disabled={isDeleting}
+      >
+        <ThemedText style={styles.deleteButtonText}>
+          {isDeleting ? "Suppression..." : "Supprimer le repas"}
+        </ThemedText>
+      </Pressable>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, gap: 12 },
-  backBtn: { paddingVertical: 6, alignSelf: "flex-start" },
-  sectionTitle: { marginTop: 12, fontSize: 18, fontWeight: "700" },
-  muted: { opacity: 0.8 },
-  summary: {
+  container: {
+    flex: 1,
+    padding: 20,
+    gap: 12,
+  },
+  muted: {
+    opacity: 0.8,
+  },
+  sectionTitle: {
+    marginTop: 12,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  summaryCard: {
     borderWidth: 1,
     borderColor: "#ddd",
     borderRadius: 12,
     padding: 12,
-    marginTop: 8,
     gap: 6,
   },
-  summaryText: { fontSize: 18, fontWeight: "800" },
-  list: { gap: 10, marginTop: 8 },
-  itemRow: {
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  summaryLine: {
+    fontSize: 15,
+  },
+  list: {
+    gap: 10,
+    marginTop: 4,
+  },
+  foodCard: {
     borderWidth: 1,
     borderColor: "#ddd",
     borderRadius: 12,
     padding: 12,
-    flexDirection: "row",
-    gap: 10,
+    gap: 4,
+  },
+  foodName: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  foodLine: {
+    fontSize: 15,
+  },
+  deleteButton: {
+    marginTop: 16,
+    backgroundColor: "#c62828",
+    paddingVertical: 12,
+    borderRadius: 10,
     alignItems: "center",
   },
-  itemContent: {
-    flex: 1,
-    gap: 2,
+  deleteButtonDisabled: {
+    opacity: 0.6,
   },
-  cardTitle: { fontSize: 16, fontWeight: "700" },
-  thumb: {
-    width: 56,
-    height: 56,
-    borderRadius: 10,
-    backgroundColor: "#eee",
+  deleteButtonText: {
+    color: "#fff",
+    fontWeight: "800",
   },
-  thumbPlaceholder: {
-    borderWidth: 1,
-    borderColor: "#ddd",
+  pressed: {
+    opacity: 0.8,
   },
 });

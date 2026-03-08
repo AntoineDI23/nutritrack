@@ -56,11 +56,15 @@ function normalizeFood(raw: any): Food | null {
     name: name || "Produit sans nom",
     brand: String(raw.brand ?? raw.brands ?? "").trim(),
     image_url: String(raw.image_url ?? raw.imageUrl ?? "").trim(),
-    nutriscore: String(raw.nutriscore ?? raw.nutriScore ?? "").trim().toLowerCase(),
+    nutriscore: String(raw.nutriscore ?? raw.nutriScore ?? "")
+      .trim()
+      .toLowerCase(),
     calories: toNumber(raw.calories ?? raw.nutrimentsPer100g?.kcal),
     proteins: toNumber(raw.proteins ?? raw.nutrimentsPer100g?.proteins),
     carbs: toNumber(raw.carbs ?? raw.nutrimentsPer100g?.carbs),
-    fats: toNumber(raw.fats ?? raw.nutrimentsPer100g?.fat ?? raw.nutrimentsPer100g?.fats),
+    fats: toNumber(
+      raw.fats ?? raw.nutrimentsPer100g?.fat ?? raw.nutrimentsPer100g?.fats,
+    ),
   };
 }
 
@@ -130,7 +134,13 @@ export async function addMeal(meal: Meal) {
   await saveMeals([meal, ...meals]);
 }
 
-export async function getMealById(id: string) {
+export async function getMealById(id: string): Promise<Meal | null> {
   const meals = await loadMeals();
   return meals.find((meal) => meal.id === id) ?? null;
+}
+
+export async function deleteMealById(id: string) {
+  const meals = await loadMeals();
+  const filteredMeals = meals.filter((meal) => meal.id !== id);
+  await saveMeals(filteredMeals);
 }
