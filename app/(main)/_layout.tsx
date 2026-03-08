@@ -1,6 +1,6 @@
 import * as React from "react";
 import { ActivityIndicator, StyleSheet } from "react-native";
-import { Redirect, Stack } from "expo-router";
+import { Redirect, Tabs } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
 import { ThemedView } from "@/components/themed-view";
 
@@ -19,7 +19,28 @@ export default function MainLayout() {
     return <Redirect href="/login" />;
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <Tabs screenOptions={{ headerShown: false }}>
+      <Tabs.Screen
+        name="(home)"
+        options={{
+          title: "Accueil",
+        }}
+      />
+      <Tabs.Screen
+        name="add"
+        options={{
+          title: "Ajouter",
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profil",
+        }}
+      />
+    </Tabs>
+  );
 }
 
 const styles = StyleSheet.create({
