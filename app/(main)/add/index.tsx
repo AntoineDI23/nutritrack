@@ -14,8 +14,8 @@ import { useRouter } from "expo-router";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { consumeLastScan } from "@/state/scan-result";
-import { getFoodByBarcode, searchFoodsByText } from "@/services/open-food-facts";
+import { consumeLastScannedFood } from "@/state/scan-result";
+import { searchFoodsByText } from "@/services/open-food-facts";
 import { MEAL_NAMES, type Food, type Meal, type MealName } from "@/types/models";
 import { addMeal } from "@/utils/meals-storage";
 
@@ -38,7 +38,6 @@ export default function AddMealPage() {
 
   const [results, setResults] = React.useState<Food[]>([]);
   const [loadingSearch, setLoadingSearch] = React.useState(false);
-  const [loadingScan, setLoadingScan] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -52,40 +51,11 @@ export default function AddMealPage() {
 
   useFocusEffect(
     React.useCallback(() => {
-      const scan = consumeLastScan();
-      if (!scan) return;
+      const scannedFood = consumeLastScannedFood();
+      if (!scannedFood) return;
 
-      let cancelled = false;
-
-      (async () => {
-        try {
-          setLoadingScan(true);
-          setError(null);
-
-          const food = await getFoodByBarcode(scan.barcode);
-
-          if (cancelled) return;
-
-          if (!food) {
-            setError("Produit non trouvé pour ce code-barres. Essaie la recherche par texte.");
-            return;
-          }
-
-          addFoodToMeal(food);
-        } catch {
-          if (!cancelled) {
-            setError("Erreur lors de la récupération du produit scanné.");
-          }
-        } finally {
-          if (!cancelled) {
-            setLoadingScan(false);
-          }
-        }
-      })();
-
-      return () => {
-        cancelled = true;
-      };
+      setError(null);
+      addFoodToMeal(scannedFood);
     }, [addFoodToMeal]),
   );
 
@@ -193,13 +163,6 @@ export default function AddMealPage() {
         >
           <ThemedText style={styles.scanButtonText}>Scanner un code-barres</ThemedText>
         </Pressable>
-
-        {loadingScan && (
-          <View style={styles.feedbackRow}>
-            <ActivityIndicator />
-            <ThemedText>Récupération du produit scanné…</ThemedText>
-          </View>
-        )}
 
         <ThemedText style={styles.muted}>Ou rechercher par texte :</ThemedText>
 

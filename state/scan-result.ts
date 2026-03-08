@@ -1,13 +1,21 @@
-type ScanResult = { barcode: string; at: number };
+import type { Food } from "@/types/models";
 
-let lastScan: ScanResult | null = null;
+type ScanResult = {
+  food: Food;
+  at: number;
+};
 
-export function setLastScan(barcode: string) {
-  lastScan = { barcode, at: Date.now() };
+let lastScannedFood: ScanResult | null = null;
+
+export function setLastScannedFood(food: Food) {
+  lastScannedFood = {
+    food,
+    at: Date.now(),
+  };
 }
 
-export function consumeLastScan(): ScanResult | null {
-  const value = lastScan;
-  lastScan = null;
-  return value;
+export function consumeLastScannedFood(): Food | null {
+  const value = lastScannedFood;
+  lastScannedFood = null;
+  return value?.food ?? null;
 }
