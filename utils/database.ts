@@ -43,6 +43,11 @@ export async function initDatabase() {
           FOREIGN KEY (meal_id) REFERENCES meals(id) ON DELETE CASCADE
         );
 
+        CREATE TABLE IF NOT EXISTS settings (
+          key TEXT PRIMARY KEY NOT NULL,
+          value TEXT NOT NULL
+        );
+
         CREATE INDEX IF NOT EXISTS idx_meals_date ON meals(date);
         CREATE INDEX IF NOT EXISTS idx_foods_meal_id ON foods(meal_id);
       `);
