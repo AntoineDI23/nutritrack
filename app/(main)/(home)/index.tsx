@@ -1,5 +1,4 @@
 import * as React from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Link, useRouter } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
@@ -7,71 +6,27 @@ import { useUser } from "@clerk/clerk-expo";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-
-type MealItem = {
-  code: string;
-  name: string;
-  brands?: string;
-  grams: number;
-  nutrimentsPer100g: {
-    kcal?: number;
-    proteins?: number;
-    carbs?: number;
-    fat?: number;
-  };
-};
-
-type Meal = {
-  id: string;
-  title: string;
-  createdAt: string;
-  items: MealItem[];
-};
-
-const STORAGE_KEY = "nutritrack.meals.v1";
+import type { Meal } from "@/types/models";
+import { computeMealTotals, loadMeals } from "@/utils/meals-storage";
 
 function round1(n: number) {
   return Math.round(n * 10) / 10;
 }
 
-function computeTotals(meal: Meal) {
-  let kcal = 0;
-  let proteins = 0;
-  let carbs = 0;
-  let fat = 0;
-
-  for (const it of meal.items) {
-    const factor = (it.grams || 0) / 100;
-    kcal += (it.nutrimentsPer100g.kcal ?? 0) * factor;
-    proteins += (it.nutrimentsPer100g.proteins ?? 0) * factor;
-    carbs += (it.nutrimentsPer100g.carbs ?? 0) * factor;
-    fat += (it.nutrimentsPer100g.fat ?? 0) * factor;
-  }
-
-  return {
-    kcal: round1(kcal),
-    proteins: round1(proteins),
-    carbs: round1(carbs),
-    fat: round1(fat),
-  };
-}
-
 export default function Page() {
   const router = useRouter();
   const { user } = useUser();
-
   const [meals, setMeals] = React.useState<Meal[]>([]);
 
-  const loadMeals = React.useCallback(async () => {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as Meal[]) : [];
-    setMeals(Array.isArray(parsed) ? parsed : []);
+  const refreshMeals = React.useCallback(async () => {
+    const storedMeals = await loadMeals();
+    setMeals(storedMeals);
   }, []);
 
   useFocusEffect(
     React.useCallback(() => {
-      loadMeals().catch(console.error);
-    }, [loadMeals]),
+      refreshMeals().catch(console.error);
+    }, [refreshMeals]),
   );
 
   const openMeal = (id: string) => {
@@ -101,27 +56,26 @@ export default function Page() {
         <ThemedText style={styles.muted}>Aucun repas enregistré pour l’instant.</ThemedText>
       ) : (
         <View style={styles.list}>
-          {meals
-            .slice()
-            .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-            .map((meal) => {
-              const totals = computeTotals(meal);
-              const date = new Date(meal.createdAt).toLocaleString();
+          {meals.map((meal) => {
+            const totals = computeMealTotals(meal);
 
-              return (
-                <Pressable
-                  key={meal.id}
-                  style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-                  onPress={() => openMeal(meal.id)}
-                >
-                  <ThemedText style={styles.cardTitle}>{meal.title}</ThemedText>
-                  <ThemedText style={styles.muted}>{date}</ThemedText>
-                  <ThemedText style={styles.muted}>
-                    {totals.kcal} kcal • P {totals.proteins}g • G {totals.carbs}g • L {totals.fat}g
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
+            return (
+              <Pressable
+                key={meal.id}
+                style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+                onPress={() => openMeal(meal.id)}
+              >
+                <ThemedText style={styles.cardTitle}>{meal.name}</ThemedText>
+                <ThemedText style={styles.muted}>{meal.date}</ThemedText>
+                <ThemedText style={styles.muted}>
+                  {meal.foods.length} aliment{meal.foods.length > 1 ? "s" : ""}
+                </ThemedText>
+                <ThemedText style={styles.muted}>
+                  {round1(totals.calories)} kcal • P {round1(totals.proteins)}g • G {round1(totals.carbs)}g • L {round1(totals.fats)}g
+                </ThemedText>
+              </Pressable>
+            );
+          })}
         </View>
       )}
     </ThemedView>

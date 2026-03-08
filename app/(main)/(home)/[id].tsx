@@ -1,85 +1,37 @@
 import * as React from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Image, Pressable, StyleSheet, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-
-type MealItem = {
-  code: string;
-  name: string;
-  brands?: string;
-  grams: number;
-  nutrimentsPer100g: {
-    kcal?: number;
-    proteins?: number;
-    carbs?: number;
-    fat?: number;
-  };
-};
-
-type Meal = {
-  id: string;
-  title: string;
-  createdAt: string;
-  items: MealItem[];
-};
-
-const STORAGE_KEY = "nutritrack.meals.v1";
+import type { Meal } from "@/types/models";
+import { computeMealTotals, getMealById } from "@/utils/meals-storage";
 
 function round1(n: number) {
   return Math.round(n * 10) / 10;
 }
 
-function computeTotals(meal: Meal) {
-  let kcal = 0;
-  let proteins = 0;
-  let carbs = 0;
-  let fat = 0;
-
-  for (const it of meal.items) {
-    const factor = (it.grams || 0) / 100;
-    kcal += (it.nutrimentsPer100g.kcal ?? 0) * factor;
-    proteins += (it.nutrimentsPer100g.proteins ?? 0) * factor;
-    carbs += (it.nutrimentsPer100g.carbs ?? 0) * factor;
-    fat += (it.nutrimentsPer100g.fat ?? 0) * factor;
-  }
-
-  return {
-    kcal: round1(kcal),
-    proteins: round1(proteins),
-    carbs: round1(carbs),
-    fat: round1(fat),
-  };
-}
-
 export default function Page() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-
   const [meal, setMeal] = React.useState<Meal | null>(null);
 
-  const loadMeal = React.useCallback(async () => {
+  const refreshMeal = React.useCallback(async () => {
     const mealId = String(id ?? "");
     if (!mealId) {
       setMeal(null);
       return;
     }
 
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as Meal[]) : [];
-    const meals = Array.isArray(parsed) ? parsed : [];
-
-    const found = meals.find((m) => m.id === mealId) ?? null;
-    setMeal(found);
+    const foundMeal = await getMealById(mealId);
+    setMeal(foundMeal);
   }, [id]);
 
   useFocusEffect(
     React.useCallback(() => {
-      loadMeal().catch(console.error);
-    }, [loadMeal]),
+      refreshMeal().catch(console.error);
+    }, [refreshMeal]),
   );
 
   if (!meal) {
@@ -87,7 +39,7 @@ export default function Page() {
       <ThemedView style={styles.container}>
         <ThemedText type="title">Repas introuvable</ThemedText>
         <ThemedText style={styles.muted}>
-          Ce repas n’existe plus (ou l’identifiant est incorrect).
+          Ce repas n’existe plus ou son identifiant est invalide.
         </ThemedText>
 
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
@@ -97,7 +49,7 @@ export default function Page() {
     );
   }
 
-  const totals = computeTotals(meal);
+  const totals = computeMealTotals(meal);
 
   return (
     <ThemedView style={styles.container}>
@@ -105,40 +57,49 @@ export default function Page() {
         <ThemedText type="link">← Retour</ThemedText>
       </Pressable>
 
-      <ThemedText type="title">{meal.title}</ThemedText>
-      <ThemedText style={styles.muted}>
-        {new Date(meal.createdAt).toLocaleString()}
-      </ThemedText>
+      <ThemedText type="title">{meal.name}</ThemedText>
+      <ThemedText style={styles.muted}>{meal.date}</ThemedText>
 
       <View style={styles.summary}>
-        <ThemedText style={styles.summaryText}>{totals.kcal} kcal</ThemedText>
+        <ThemedText style={styles.summaryText}>{round1(totals.calories)} kcal</ThemedText>
         <ThemedText style={styles.muted}>
-          Protéines {totals.proteins}g • Glucides {totals.carbs}g • Lipides {totals.fat}g
+          Protéines {round1(totals.proteins)}g • Glucides {round1(totals.carbs)}g • Lipides {round1(totals.fats)}g
         </ThemedText>
       </View>
 
       <ThemedText style={styles.sectionTitle}>Aliments</ThemedText>
 
-      {meal.items.length === 0 ? (
+      {meal.foods.length === 0 ? (
         <ThemedText style={styles.muted}>Aucun aliment dans ce repas.</ThemedText>
       ) : (
         <View style={styles.list}>
-          {meal.items.map((it, idx) => {
-            const factor = it.grams / 100;
-            const kcal = round1((it.nutrimentsPer100g.kcal ?? 0) * factor);
+          {meal.foods.map((food, index) => (
+            <View key={`${food.id}-${index}`} style={styles.itemRow}>
+              {food.image_url ? (
+                <Image source={{ uri: food.image_url }} style={styles.thumb} />
+              ) : (
+                <View style={[styles.thumb, styles.thumbPlaceholder]} />
+              )}
 
-            return (
-              <View key={`${it.code}-${idx}`} style={styles.itemRow}>
-                <View style={{ flex: 1 }}>
-                  <ThemedText style={styles.cardTitle}>{it.name}</ThemedText>
-                  {it.brands ? <ThemedText style={styles.muted}>{it.brands}</ThemedText> : null}
+              <View style={styles.itemContent}>
+                <ThemedText style={styles.cardTitle}>{food.name}</ThemedText>
+
+                {!!food.brand && (
+                  <ThemedText style={styles.muted}>{food.brand}</ThemedText>
+                )}
+
+                <ThemedText style={styles.muted}>
+                  {round1(food.calories)} kcal • P {round1(food.proteins)}g • G {round1(food.carbs)}g • L {round1(food.fats)}g
+                </ThemedText>
+
+                {!!food.nutriscore && (
                   <ThemedText style={styles.muted}>
-                    {it.grams}g • {kcal} kcal
+                    Nutri-Score {food.nutriscore.toUpperCase()}
                   </ThemedText>
-                </View>
+                )}
               </View>
-            );
-          })}
+            </View>
+          ))}
         </View>
       )}
     </ThemedView>
@@ -167,6 +128,21 @@ const styles = StyleSheet.create({
     padding: 12,
     flexDirection: "row",
     gap: 10,
+    alignItems: "center",
+  },
+  itemContent: {
+    flex: 1,
+    gap: 2,
   },
   cardTitle: { fontSize: 16, fontWeight: "700" },
+  thumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+    backgroundColor: "#eee",
+  },
+  thumbPlaceholder: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
 });

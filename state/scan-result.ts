@@ -7,7 +7,7 @@ export function setLastScan(barcode: string) {
 }
 
 export function consumeLastScan(): ScanResult | null {
-  const v = lastScan;
+  const value = lastScan;
   lastScan = null;
-  return v;
+  return value;
 }

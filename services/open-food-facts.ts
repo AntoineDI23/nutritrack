@@ -1,68 +1,54 @@
+import type { Food } from "@/types/models";
+
 type Nutriments = Record<string, unknown>;
 
-export type FoodSearchItem = {
-  code: string;
-  name: string;
-  brands?: string;
-  imageUrl?: string;
-  nutriScore?: string;
-  nutrimentsPer100g: {
-    kcal?: number;
-    proteins?: number;
-    carbs?: number;
-    fat?: number;
-    sugars?: number;
-    salt?: number;
-  };
-};
-
-function toNumber(v: unknown): number | undefined {
-  if (v === null || v === undefined) return undefined;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : undefined;
+function toNumber(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
 }
 
-function getKcalPer100g(nutriments?: Nutriments): number | undefined {
-  if (!nutriments) return undefined;
+function getCaloriesPer100g(nutriments?: Nutriments): number {
+  if (!nutriments) return 0;
 
-  const kcal = toNumber(nutriments["energy-kcal_100g"]) ?? toNumber(nutriments["energy-kcal"]);
-  if (kcal !== undefined) return kcal;
+  const kcal =
+    toNumber(nutriments["energy-kcal_100g"]) ||
+    toNumber(nutriments["energy-kcal"]);
+
+  if (kcal > 0) return kcal;
 
   const energyKj = toNumber(nutriments["energy_100g"]);
-  if (energyKj !== undefined) return Math.round((energyKj / 4.184) * 10) / 10;
+  if (energyKj > 0) {
+    return Math.round((energyKj / 4.184) * 10) / 10;
+  }
 
-  return undefined;
+  return 0;
 }
 
-function buildItem(p: any): FoodSearchItem {
+function buildFood(product: any): Food {
   const name =
-    (p.product_name_fr?.trim?.() ? p.product_name_fr : undefined) ||
-    (p.product_name?.trim?.() ? p.product_name : undefined) ||
-    (p.product_name_en?.trim?.() ? p.product_name_en : undefined) ||
+    (product.product_name_fr?.trim?.() ? product.product_name_fr : undefined) ||
+    (product.product_name?.trim?.() ? product.product_name : undefined) ||
+    (product.product_name_en?.trim?.() ? product.product_name_en : undefined) ||
     "Produit sans nom";
 
-  const nutriments: Nutriments | undefined = p.nutriments;
+  const nutriments: Nutriments | undefined = product.nutriments;
 
   return {
-    code: String(p.code ?? ""),
+    id: String(product.code ?? ""),
     name,
-    brands: p.brands ? String(p.brands) : undefined,
-    imageUrl: p.image_url ? String(p.image_url) : undefined,
-    nutriScore: p.nutriscore_grade ? String(p.nutriscore_grade) : undefined,
-    nutrimentsPer100g: {
-      kcal: getKcalPer100g(nutriments),
-      proteins: toNumber(nutriments?.["proteins_100g"]),
-      carbs: toNumber(nutriments?.["carbohydrates_100g"]),
-      fat: toNumber(nutriments?.["fat_100g"]),
-      sugars: toNumber(nutriments?.["sugars_100g"]),
-      salt: toNumber(nutriments?.["salt_100g"]),
-    },
+    brand: String(product.brands ?? "").trim(),
+    image_url: String(product.image_url ?? "").trim(),
+    nutriscore: String(product.nutriscore_grade ?? "").trim().toLowerCase(),
+    calories: getCaloriesPer100g(nutriments),
+    proteins: toNumber(nutriments?.["proteins_100g"]),
+    carbs: toNumber(nutriments?.["carbohydrates_100g"]),
+    fats: toNumber(nutriments?.["fat_100g"]),
   };
 }
 
 const OFF_USER_AGENT = "nutritrack/1.0 (expo)";
 
-export async function searchFoodsByText(query: string, pageSize = 10): Promise<FoodSearchItem[]> {
+export async function searchFoodsByText(query: string, pageSize = 10): Promise<Food[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
 
@@ -75,24 +61,26 @@ export async function searchFoodsByText(query: string, pageSize = 10): Promise<F
     "&fields=code,product_name,product_name_fr,product_name_en,brands,nutriments,image_url,nutriscore_grade" +
     `&page_size=${pageSize}`;
 
-  const res = await fetch(url, {
+  const response = await fetch(url, {
     headers: {
       Accept: "application/json",
       "User-Agent": OFF_USER_AGENT,
     },
   });
 
-  if (!res.ok) {
-    throw new Error(`Open Food Facts error: ${res.status}`);
+  if (!response.ok) {
+    throw new Error(`Open Food Facts error: ${response.status}`);
   }
 
-  const data = await res.json();
+  const data = await response.json();
   const products: any[] = Array.isArray(data?.products) ? data.products : [];
 
-  return products.map(buildItem).filter((p) => p.code.length > 0);
+  return products
+    .map(buildFood)
+    .filter((food) => food.id.length > 0);
 }
 
-export async function getFoodByBarcode(barcode: string): Promise<FoodSearchItem | null> {
+export async function getFoodByBarcode(barcode: string): Promise<Food | null> {
   const code = barcode.trim();
   if (!code) return null;
 
@@ -100,24 +88,23 @@ export async function getFoodByBarcode(barcode: string): Promise<FoodSearchItem 
     `https://fr.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json` +
     "?fields=code,product_name,product_name_fr,product_name_en,brands,nutriments,image_url,nutriscore_grade";
 
-  const res = await fetch(url, {
+  const response = await fetch(url, {
     headers: {
       Accept: "application/json",
       "User-Agent": OFF_USER_AGENT,
     },
   });
 
-  if (res.status === 404) return null;
-  if (!res.ok) {
-    throw new Error(`Open Food Facts product error: ${res.status}`);
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`Open Food Facts product error: ${response.status}`);
   }
 
-  const data = await res.json();
-
+  const data = await response.json();
   if (!data?.product) return null;
 
-  const item = buildItem(data.product);
-  if (!item.code) return null;
+  const food = buildFood(data.product);
+  if (!food.id) return null;
 
-  return item;
+  return food;
 }
